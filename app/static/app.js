@@ -1,5 +1,5 @@
 /* MeetMind frontend — vanilla JS, no build step.
- * Workflow: upload audio → POST /api/analyze → render structured summary.
+ * Workflow: upload audio → POST /api/analyze → render structured report.
  */
 (() => {
   "use strict";
@@ -7,6 +7,13 @@
   // Mirrors app/config.py defaults (frontend cannot read env).
   const ALLOWED_EXTENSIONS = ["mp3", "wav", "m4a"];
   const MAX_UPLOAD_MB = 100;
+
+  const STAGES = [
+    { key: "upload", label: "Uploading" },
+    { key: "transcribe", label: "Transcribing meeting" },
+    { key: "analyze", label: "Analyzing transcript" },
+    { key: "report", label: "Preparing meeting report" },
+  ];
 
   const $ = (id) => document.getElementById(id);
 
@@ -21,22 +28,28 @@
   const resetBtn = $("reset-btn");
   const statusEl = $("status");
   const statusTextEl = $("status-text");
+  const statusStepsEl = $("status-steps");
   const statusElapsedEl = $("status-elapsed");
   const errorEl = $("error");
   const resultsEl = $("results");
+  const headlineEl = $("report-headline");
   const metaStrip = $("meta-strip");
   const summaryTextEl = $("summary-text");
   const keyPointsListEl = $("keypoints-list");
   const decisionsListEl = $("decisions-list");
   const actionsListEl = $("actions-list");
+  const topicsListEl = $("topics-list");
+  const questionsListEl = $("questions-list");
   const keyPointsCountEl = $("keypoints-count");
   const decisionsCountEl = $("decisions-count");
   const actionsCountEl = $("actions-count");
+  const questionsCountEl = $("questions-count");
   const transcriptTextEl = $("transcript-text");
   const transcriptCard = document.querySelector(".transcript-card");
 
   let selectedFile = null;
   let elapsedTimer = null;
+  let stageTimer = null;
 
   // ---------- helpers ---------------------------------------------------- //
 
@@ -60,6 +73,13 @@
   function clearError() {
     errorEl.textContent = "";
     errorEl.hidden = true;
+  }
+
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text != null) node.textContent = text;
+    return node;
   }
 
   // ---------- file selection --------------------------------------------- //
@@ -103,22 +123,44 @@
 
   // ---------- loading ----------------------------------------------------- //
 
+  function setStage(index) {
+    const items = statusStepsEl.querySelectorAll("li");
+    items.forEach((li, i) => {
+      li.classList.toggle("done", i < index);
+      li.classList.toggle("active", i === index);
+    });
+    if (STAGES[index]) statusTextEl.textContent = `${STAGES[index].label}…`;
+  }
+
   function startLoading() {
     statusEl.hidden = false;
     resultsEl.hidden = true;
     analyzeBtn.disabled = true;
-    statusTextEl.textContent = "Analyzing your meeting…";
+    let stage = 0;
+    setStage(stage);
     const started = Date.now();
     statusElapsedEl.textContent = "0s";
     elapsedTimer = setInterval(() => {
       statusElapsedEl.textContent = `${Math.round((Date.now() - started) / 1000)}s`;
     }, 1000);
+    // Backend is one POST (upload → transcribe → analyze), so advance the
+    // visible stage on a timer to communicate progress honestly.
+    stageTimer = setInterval(() => {
+      if (stage < STAGES.length - 1) {
+        stage += 1;
+        setStage(stage);
+      }
+    }, 6000);
   }
 
   function stopLoading() {
     if (elapsedTimer) {
       clearInterval(elapsedTimer);
       elapsedTimer = null;
+    }
+    if (stageTimer) {
+      clearInterval(stageTimer);
+      stageTimer = null;
     }
     statusEl.hidden = true;
     analyzeBtn.disabled = !selectedFile;
@@ -166,34 +208,106 @@
   // ---------- rendering ---------------------------------------------------- //
 
   function addMetaChip(label, value) {
-    const chip = document.createElement("span");
-    chip.className = "meta-chip";
-    const strong = document.createElement("strong");
-    strong.textContent = value;
-    chip.append(`${label}: `, strong);
+    const chip = el("span", "meta-chip");
+    chip.append(`${label}: `, Object.assign(el("strong"), { textContent: value }));
     metaStrip.appendChild(chip);
   }
 
-  function renderList(listEl, items, emptyText) {
+  function renderBullets(listEl, items, emptyText) {
     listEl.innerHTML = "";
-    const entries = Array.isArray(items) ? items : [];
+    const entries = Array.isArray(items) ? items.filter(Boolean) : [];
     if (entries.length === 0) {
-      const li = document.createElement("li");
-      li.className = "empty";
-      li.textContent = emptyText;
-      listEl.appendChild(li);
+      listEl.appendChild(el("li", "empty", emptyText));
       return 0;
     }
-    for (const text of entries) {
-      const li = document.createElement("li");
-      li.textContent = text;
-      listEl.appendChild(li);
+    for (const item of entries) {
+      listEl.appendChild(el("li", null, typeof item === "string" ? item : JSON.stringify(item)));
     }
     return entries.length;
   }
 
+  function emptyState(message) {
+    return el("p", "empty", message);
+  }
+
+  function evidenceBlock(quote) {
+    if (!quote) return null;
+    const bq = el("blockquote", "evidence");
+    bq.textContent = `\u201C${quote}\u201D`;
+    return bq;
+  }
+
+  function renderDecisions(container, items) {
+    container.innerHTML = "";
+    const entries = Array.isArray(items) ? items : [];
+    if (entries.length === 0) {
+      container.appendChild(emptyState("No explicit decisions were detected in this meeting."));
+      return 0;
+    }
+    entries.forEach((item, i) => {
+      const d = typeof item === "string" ? { decision: item, reason: "", evidence: item } : item;
+      const card = el("div", "item-card decision-card");
+      card.appendChild(el("p", "item-title", `${i + 1}. ${d.decision || "—"}`));
+      if (d.reason) {
+        const reason = el("p", "item-sub");
+        reason.appendChild(el("span", "field-label", "Reason: "));
+        reason.append(document.createTextNode(d.reason));
+        card.appendChild(reason);
+      }
+      const ev = evidenceBlock(d.evidence);
+      if (ev) card.appendChild(ev);
+      container.appendChild(card);
+    });
+    return entries.length;
+  }
+
+  function priorityBadge(priority) {
+    const p = (priority || "medium").toLowerCase();
+    const badge = el("span", `priority priority-${p}`, p.charAt(0).toUpperCase() + p.slice(1));
+    return badge;
+  }
+
+  function renderActions(container, items) {
+    container.innerHTML = "";
+    const entries = Array.isArray(items) ? items : [];
+    if (entries.length === 0) {
+      container.appendChild(emptyState("No action items were detected in this meeting."));
+      return 0;
+    }
+    entries.forEach((item) => {
+      const a = typeof item === "string" ? { task: item, evidence: item } : item;
+      const card = el("div", "item-card action-card");
+      const head = el("div", "action-head");
+      head.appendChild(el("p", "item-title", a.task || "—"));
+      head.appendChild(priorityBadge(a.priority));
+      card.appendChild(head);
+      const meta = el("div", "action-meta");
+      meta.appendChild(el("span", "meta-pill", `Owner: ${a.owner || "—"}`));
+      meta.appendChild(el("span", "meta-pill", `Deadline: ${a.deadline || "—"}`));
+      card.appendChild(meta);
+      const ev = evidenceBlock(a.evidence);
+      if (ev) card.appendChild(ev);
+      container.appendChild(card);
+    });
+    return entries.length;
+  }
+
+  function renderTopics(container, topics) {
+    container.innerHTML = "";
+    const entries = Array.isArray(topics) ? topics.filter(Boolean) : [];
+    if (entries.length === 0) {
+      container.appendChild(emptyState("No topics were extracted."));
+      return;
+    }
+    for (const t of entries) {
+      container.appendChild(el("span", "chip", String(t)));
+    }
+  }
+
   function renderResults(data) {
     stopLoading();
+
+    headlineEl.textContent = data.headline || "Meeting report";
 
     metaStrip.innerHTML = "";
     addMetaChip("File", data.filename || "—");
@@ -204,24 +318,25 @@
     }
     if (data.backends && data.backends.speech_to_text) {
       addMetaChip("STT", data.backends.speech_to_text);
-      addMetaChip("Summarizer", data.backends.summarization || "—");
+      addMetaChip("Analysis", data.backends.summarization || "—");
     }
 
     summaryTextEl.textContent =
       data.summary || "No summary could be generated for this recording.";
 
-    const kpCount = renderList(
+    const kpCount = renderBullets(
       keyPointsListEl, data.key_points, "No key points were detected in this meeting."
     );
-    const dCount = renderList(
-      decisionsListEl, data.decisions, "No explicit decisions were detected in this meeting."
-    );
-    const aCount = renderList(
-      actionsListEl, data.action_items, "No action items were detected in this meeting."
+    const dCount = renderDecisions(decisionsListEl, data.decisions);
+    const aCount = renderActions(actionsListEl, data.action_items);
+    renderTopics(topicsListEl, data.topics);
+    const qCount = renderBullets(
+      questionsListEl, data.open_questions, "No open questions — everything looks resolved."
     );
     keyPointsCountEl.textContent = kpCount;
     decisionsCountEl.textContent = dCount;
     actionsCountEl.textContent = aCount;
+    questionsCountEl.textContent = qCount;
 
     transcriptTextEl.textContent = data.transcript || "";
     transcriptCard.open = false;

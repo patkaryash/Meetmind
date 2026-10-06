@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MeetMind — AI Meeting Summaries</title>
+  <title>MeetMind — AI Meeting Intelligence</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Crect%20width='64'%20height='64'%20rx='14'%20fill='%234f46e5'/%3E%3Ctext%20x='32'%20y='44'%20font-family='Arial'%20font-size='36'%20font-weight='bold'%20fill='white'%20text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -14,7 +14,7 @@
         <span class="brand-mark" aria-hidden="true">M</span>
         <div class="brand-text">
           <h1>MeetMind</h1>
-          <p>AI-based meeting transcript summarization</p>
+          <p>AI Meeting Intelligence</p>
         </div>
       </div>
       <div class="pipeline-chip" aria-label="Workflow">
@@ -29,11 +29,11 @@
 
   <main class="container">
 
-    <!-- 1. Upload -->
+    <!-- 1. Upload (unchanged flow) -->
     <section id="upload-card" class="card">
-      <h2 class="card-title">Upload a meeting recording</h2>
+      <h2 class="card-title">Upload meeting recording</h2>
       <p class="card-subtitle">
-        MP3, WAV or M4A up to 100&nbsp;MB. Processing runs locally — nothing is stored.
+        MP3, WAV or M4A up to 100&nbsp;MB. Transcribed automatically, then analyzed into a structured report.
       </p>
 
       <div id="dropzone" class="dropzone" tabindex="0" role="button"
@@ -71,14 +71,17 @@
       </div>
     </section>
 
-    <!-- 2. Status -->
+    <!-- 2. Loading stages -->
     <section id="status" class="card status-card" hidden aria-live="polite">
       <span class="spinner" aria-hidden="true"></span>
       <div class="status-text">
-        <strong id="status-text">Analyzing your meeting…</strong>
-        <span class="muted" id="status-hint">
-          Audio is transcribed locally with Whisper, then summarized with NLP.
-        </span>
+        <strong id="status-text">Uploading…</strong>
+        <ol id="status-steps" class="status-steps">
+          <li data-step="upload">Uploading</li>
+          <li data-step="transcribe">Transcribing meeting</li>
+          <li data-step="analyze">Analyzing transcript</li>
+          <li data-step="report">Preparing meeting report</li>
+        </ol>
       </div>
       <span class="status-elapsed" id="status-elapsed">0s</span>
     </section>
@@ -86,66 +89,93 @@
     <!-- 3. Error -->
     <section id="error" class="error-banner" hidden role="alert"></section>
 
-    <!-- 4. Results -->
+    <!-- 4. Meeting report -->
     <section id="results" hidden>
 
-      <div id="meta-strip" class="meta-strip"></div>
+      <div class="report-head card">
+        <p class="eyebrow">Meeting analysis</p>
+        <h2 id="report-headline">Meeting report</h2>
+        <div id="meta-strip" class="meta-strip"></div>
+      </div>
 
-      <article class="card summary-card">
+      <article class="card">
         <div class="card-head">
           <span class="card-icon summary-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
               <path d="M4 6h16M4 12h10M4 18h7" stroke-linecap="round"/>
             </svg>
           </span>
-          <h3>Meeting Summary</h3>
+          <h3>Executive Summary</h3>
         </div>
         <p id="summary-text" class="summary-text"></p>
       </article>
 
-      <div class="results-grid">
-        <article class="card list-card keypoints-card">
-          <div class="card-head">
-            <span class="card-icon keypoints-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/>
-                <circle cx="12" cy="12" r="0.5" fill="currentColor"/>
-              </svg>
-            </span>
-            <h3>Key Points</h3>
-            <span class="count-badge" id="keypoints-count"></span>
-          </div>
-          <ul id="keypoints-list" class="bullet-list"></ul>
-        </article>
+      <article class="card">
+        <div class="card-head">
+          <span class="card-icon keypoints-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/>
+              <circle cx="12" cy="12" r="0.5" fill="currentColor"/>
+            </svg>
+          </span>
+          <h3>Key Points</h3>
+          <span class="count-badge" id="keypoints-count"></span>
+        </div>
+        <ul id="keypoints-list" class="bullet-list"></ul>
+      </article>
 
-        <article class="card list-card decisions-card">
-          <div class="card-head">
-            <span class="card-icon decisions-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M12 3l7 3v5c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6l7-3z" stroke-linejoin="round"/>
-              </svg>
-            </span>
-            <h3>Decisions</h3>
-            <span class="count-badge" id="decisions-count"></span>
-          </div>
-          <ul id="decisions-list" class="bullet-list"></ul>
-        </article>
+      <article class="card">
+        <div class="card-head">
+          <span class="card-icon decisions-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M9 12l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M12 3l7 3v5c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6l7-3z" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <h3>Decisions</h3>
+          <span class="count-badge" id="decisions-count"></span>
+        </div>
+        <div id="decisions-list" class="stack"></div>
+      </article>
 
-        <article class="card list-card actions-card">
-          <div class="card-head">
-            <span class="card-icon actions-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M8 6h13M8 12h13M8 18h13" stroke-linecap="round"/>
-                <path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" stroke-linecap="round" stroke-width="2.4"/>
-              </svg>
-            </span>
-            <h3>Action Items</h3>
-            <span class="count-badge" id="actions-count"></span>
-          </div>
-          <ul id="actions-list" class="bullet-list"></ul>
-        </article>
-      </div>
+      <article class="card">
+        <div class="card-head">
+          <span class="card-icon actions-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M8 6h13M8 12h13M8 18h13" stroke-linecap="round"/>
+              <path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" stroke-linecap="round" stroke-width="2.4"/>
+            </svg>
+          </span>
+          <h3>Action Items</h3>
+          <span class="count-badge" id="actions-count"></span>
+        </div>
+        <div id="actions-list" class="stack"></div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="card-icon topics-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M4 7h16M4 12h16M4 17h10" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <h3>Topics Discussed</h3>
+        </div>
+        <div id="topics-list" class="chips"></div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <span class="card-icon questions-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.1.9-1.1 1.8" stroke-linecap="round"/><path d="M12 16.5h.01" stroke-linecap="round" stroke-width="2.4"/>
+            </svg>
+          </span>
+          <h3>Open Questions</h3>
+          <span class="count-badge" id="questions-count"></span>
+        </div>
+        <ul id="questions-list" class="bullet-list"></ul>
+      </article>
 
       <details class="card transcript-card">
         <summary>
@@ -157,7 +187,9 @@
           Full Transcript
           <span class="muted summary-chevron">▾</span>
         </summary>
-        <p id="transcript-text" class="transcript-text"></p>
+        <div class="transcript-wrap">
+          <p id="transcript-text" class="transcript-text"></p>
+        </div>
       </details>
 
       <div class="actions">
@@ -167,7 +199,7 @@
   </main>
 
   <footer class="footer">
-    MeetMind · Whisper (faster-whisper) + extractive NLP · runs entirely on this machine
+    MeetMind · Whisper speech-to-text + Gemini meeting intelligence
   </footer>
 
   <noscript>

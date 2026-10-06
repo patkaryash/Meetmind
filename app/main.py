@@ -15,11 +15,13 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import (
     ALLOWED_AUDIO_EXTENSIONS,
+    GEMINI_MODEL,
     MAX_UPLOAD_BYTES,
     STATIC_DIR,
     UPLOAD_DIR,
 )
 from app.pipeline.runner import MeetingPipeline
+from app.pipeline.summarize.gemini import GeminiAnalysisError
 
 app = FastAPI(title="MeetMind", version="1.0.0")
 pipeline = MeetingPipeline()
@@ -36,7 +38,13 @@ def _startup() -> None:
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok"}
+    from app.config import GEMINI_API_KEY
+
+    return {
+        "status": "ok",
+        "gemini_configured": bool(GEMINI_API_KEY),
+        "gemini_model": GEMINI_MODEL,
+    }
 
 
 @app.post("/api/analyze")
@@ -73,6 +81,10 @@ async def analyze(audio: UploadFile = File(...)) -> JSONResponse:
     started = time.perf_counter()
     try:
         result = pipeline.run(upload_path)
+    except GeminiAnalysisError as exc:
+        # Transcription worked but LLM analysis failed: 502 with a useful
+        # message (bad key, quota, invalid JSON, ...) instead of a crash.
+        raise HTTPException(status_code=502, detail=f"Meeting analysis failed: {exc}") from exc
     except Exception as exc:  # noqa: BLE001 — surface as a clean API error
         raise HTTPException(
             status_code=500,

@@ -28,12 +28,24 @@ def get_transcriber() -> Transcriber:
 
 
 def get_summarizer() -> Summarizer:
-    """Factory: summarization backend (swap here)."""
+    """Factory: summarization backend (swap here).
+
+    Uses Gemini when GEMINI_API_KEY is configured, otherwise falls back to
+    the local extractive summarizer so the app still works offline / without
+    a key (e.g. for STT-only testing).
+    """
     global _summarizer
     if _summarizer is None:
         with _lock:
             if _summarizer is None:
-                from app.pipeline.summarize.extractive import ExtractiveSummarizer
+                from app.config import GEMINI_API_KEY
 
-                _summarizer = ExtractiveSummarizer()
+                if GEMINI_API_KEY:
+                    from app.pipeline.summarize.gemini import GeminiSummarizer
+
+                    _summarizer = GeminiSummarizer()
+                else:
+                    from app.pipeline.summarize.extractive import ExtractiveSummarizer
+
+                    _summarizer = ExtractiveSummarizer()
     return _summarizer

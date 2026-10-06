@@ -25,12 +25,16 @@ class PipelineResult:
         return self.transcribe_seconds + self.summarize_seconds
 
     def to_dict(self) -> dict:
+        summary_dict = self.summary.to_dict()
         return {
             "transcript": self.transcript,
-            "summary": self.summary.summary,
-            "key_points": self.summary.key_points,
-            "decisions": self.summary.decisions,
-            "action_items": self.summary.action_items,
+            "headline": summary_dict["headline"],
+            "summary": summary_dict["summary"],
+            "key_points": summary_dict["key_points"],
+            "decisions": summary_dict["decisions"],
+            "action_items": summary_dict["action_items"],
+            "topics": summary_dict["topics"],
+            "open_questions": summary_dict["open_questions"],
             "language": self.language,
             "audio_duration_seconds": round(self.duration_seconds, 2),
             "backends": {
