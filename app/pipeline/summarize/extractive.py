@@ -107,6 +107,15 @@ def _jaccard(a: str, b: str) -> float:
     return len(sa & sb) / len(sa | sb)
 
 
+def _headline_for(summary: str) -> str:
+    """Derive a short headline from the summary (fallback backend only)."""
+    first = split_sentences(summary)
+    head = (first[0] if first else summary).strip()
+    if len(head) > 90:
+        head = head[:87].rsplit(" ", 1)[0] + "..."
+    return head or "Meeting summary"
+
+
 # --------------------------------------------------------------------------- #
 # Pattern rules for decisions / action items
 # --------------------------------------------------------------------------- #
@@ -211,16 +220,21 @@ class ExtractiveSummarizer(Summarizer):
         text = transcript_text.strip()
         if not text:
             return MeetingSummary(
-                summary="No speech was detected in the provided audio."
+                headline="No meeting content detected",
+                summary="No speech was detected in the provided audio.",
             )
 
         sentences = split_sentences(text)
         if not sentences:
-            return MeetingSummary(summary=text)
+            return MeetingSummary(headline="Meeting summary", summary=text)
 
         # Very short transcripts: everything is the summary.
         if len(sentences) <= self.summary_sentences:
-            return MeetingSummary(summary=" ".join(sentences))
+            joined = " ".join(sentences)
+            return MeetingSummary(
+                headline=_headline_for(joined),
+                summary=joined,
+            )
 
         scores = self._score(sentences)
         ranked = list(zip(sentences, scores))
@@ -232,23 +246,28 @@ class ExtractiveSummarizer(Summarizer):
         summary_set = {s for s, _ in summary_sents}
 
         # 2. Decisions (pattern extraction).
-        decisions: list[str] = []
+        decision_texts: list[str] = []
         for s in sentences:
             if DECISION_PATTERNS.search(s):
                 bullet = _clean_bullet(s)
-                if bullet and not any(_jaccard(bullet, d) > 0.5 for d in decisions):
-                    decisions.append(bullet)
-            if len(decisions) >= self.max_list_items:
+                if bullet and not any(_jaccard(bullet, d) > 0.5 for d in decision_texts):
+                    decision_texts.append(bullet)
+            if len(decision_texts) >= self.max_list_items:
                 break
+        decisions = [
+            {"decision": d, "reason": "", "evidence": d} for d in decision_texts
+        ]
 
         # 3. Action items (pattern extraction).
-        action_items: list[str] = []
+        action_texts: list[str] = []
+        owners: list[str | None] = []
         for s in sentences:
             if ACTION_PATTERNS.search(s):
                 bullet = _clean_bullet(s)
-                if bullet and not any(_jaccard(bullet, a) > 0.5 for a in action_items):
-                    # "Sarah will fix the bugs" -> "Sarah: fix the bugs"
+                if bullet and not any(_jaccard(bullet, a) > 0.5 for a in action_texts):
+                    # "Sarah will fix the bugs" -> owner Sarah, task fix...
                     m = _NAME_PREFIX.match(s)
+                    owner: str | None = m.group(1) if m else None
                     if m and not bullet.startswith(m.group(1) + ":"):
                         rest_of_bullet = _clean_bullet(s[m.end(1):])
                         if rest_of_bullet:
@@ -256,9 +275,20 @@ class ExtractiveSummarizer(Summarizer):
                                 rest_of_bullet[0].lower() + rest_of_bullet[1:]
                             )
                         bullet = f"{m.group(1)}: {rest_of_bullet}"
-                    action_items.append(bullet)
-            if len(action_items) >= self.max_list_items:
+                    action_texts.append(bullet)
+                    owners.append(owner)
+            if len(action_texts) >= self.max_list_items:
                 break
+        action_items = [
+            {
+                "task": t.split(": ", 1)[1] if ": " in t else t,
+                "owner": o,
+                "deadline": None,
+                "priority": "medium",
+                "evidence": t,
+            }
+            for t, o in zip(action_texts, owners)
+        ]
 
         # 4. Key points: next-best diverse sentences, excluding anything
         #    already surfaced above so each section adds new information,
@@ -271,12 +301,15 @@ class ExtractiveSummarizer(Summarizer):
         key_points = self._pick(
             rest,
             self.max_key_points,
-            avoid=[*[s for s, _ in summary_sents], *decisions, *action_items],
+            avoid=[*[s for s, _ in summary_sents], *decision_texts, *action_texts],
         )
 
         return MeetingSummary(
+            headline=_headline_for(summary),
             summary=summary,
             key_points=key_points,
             decisions=decisions,
             action_items=action_items,
+            topics=[],
+            open_questions=[],
         )

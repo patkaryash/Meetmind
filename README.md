@@ -10,17 +10,23 @@ Upload an MP3/WAV/M4A recording and MeetMind:
 
 1. **Transcribes** the audio locally with the open-source
    [faster-whisper](https://github.com/SYSTRAN/faster-whisper) speech-to-text model.
-2. **Summarizes** the transcript with a modular NLP pipeline (extractive
-   scoring + pattern extraction).
+2. **Analyzes** the transcript with Gemini (structured JSON: headline,
+   summary, key points, decisions + evidence, action items with
+   owner/deadline/priority + evidence, topics, open questions).
+   Without `GEMINI_API_KEY` it falls back to the local extractive NLP
+   pipeline so transcription can still be tested offline.
 3. **Displays** a dashboard with:
-   - **Meeting Summary** — 2–3 sentence overview
+   - **Executive Summary** — concise overview + headline
    - **Key Points** — most informative, diverse statements
-   - **Decisions** — explicitly decided/agreed items
-   - **Action Items** — tasks with owners and deadlines (e.g. `Sarah: will fix … by Thursday`)
-   - Full transcript, language, audio length and processing time
+   - **Decisions** — agreed items with reason + verbatim evidence
+   - **Action Items** — task, owner, deadline, priority + evidence
+   - **Topics** — compact chips
+   - **Open Questions** — unresolved items
+   - Full transcript (collapsible), language, audio length and timing
 
-No authentication, no database, no cloud calls — audio is processed in memory
-and on your machine only.
+No authentication, no database — audio is processed in memory
+and deleted after analysis. Only the transcript text is sent to Gemini;
+the API key stays in `.env` on the backend and is never exposed to the frontend.
 
 ## Setup on your laptop (Windows, macOS, Linux)
 
@@ -47,7 +53,8 @@ python -m venv .venv
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Start the app
+# 4. Configure Gemini (backend only) and start the app
+#   Copy .env.example to .env and set GEMINI_API_KEY (+ optional GEMINI_MODEL)
 python -m uvicorn app.main:app --port 8000
 ```
 
@@ -90,7 +97,7 @@ python scripts/run_pipeline_test.py
 ```
 app/
 ├── main.py                 # FastAPI app: /api/analyze, /api/health, static UI
-├── config.py               # env-driven settings
+├── config.py               # env-driven settings (incl. GEMINI_API_KEY/MODEL)
 ├── static/                 # dashboard (plain HTML/CSS/JS, no build step)
 └── pipeline/
     ├── registry.py         # ← SWAP COMPONENTS HERE (factories)
@@ -99,10 +106,12 @@ app/
     │   ├── base.py         #   Transcriber interface
     │   └── whisper.py      #   faster-whisper implementation
     └── summarize/          # summarization component
-        ├── base.py         #   Summarizer interface
-        └── extractive.py   #   pure-Python extractive implementation
+        ├── base.py         #   Summarizer interface + MeetingSummary schema
+        ├── gemini.py       #   Gemini structured-JSON implementation
+        └── extractive.py   #   pure-Python fallback (no key / offline)
 samples/                    # sample meeting audio + TTS generator
 scripts/run_pipeline_test.py
+scripts/verify_gemini.py     # transcript → Gemini JSON check (needs .env key)
 ```
 
 ## Swapping components
@@ -122,13 +131,18 @@ touches a concrete implementation:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `MEETMIND_WHISPER_MODEL` | `base.en` | Whisper model size (e.g. `tiny.en`, `small.en`) |
+| `MEETMIND_WHISPER_MODEL` | `base.en` | Whisper model size (`tiny.en` ≈ 2–3× faster, slightly less accurate) |
+| `MEETMIND_WHISPER_BEAM_SIZE` | `1` | Decoding beams: `1` = fast greedy, `5` = slower but more accurate |
 | `MEETMIND_WHISPER_DEVICE` | `cpu` | `cpu` or `cuda` |
 | `MEETMIND_WHISPER_COMPUTE_TYPE` | `int8` | faster-whisper compute type |
 | `MEETMIND_MAX_UPLOAD_MB` | `100` | Upload size limit (MB) |
 | `MEETMIND_SUMMARY_SENTENCES` | `3` | Sentences in the overview summary |
 | `MEETMIND_MAX_KEY_POINTS` | `6` | Max key-point bullets |
 | `MEETMIND_MAX_LIST_ITEMS` | `8` | Max decisions / action items |
+| `GEMINI_API_KEY` | *(empty)* | Gemini key (backend only, in `.env`, never frontend) |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Gemini Flash model name (configurable) |
+| `GEMINI_MAX_TRANSCRIPT_CHARS` | `24000` | Truncation cap for very long transcripts |
+| `GEMINI_MAX_OUTPUT_TOKENS` | `2000` | Bounds Gemini latency/cost |
 
 ## API
 
@@ -137,14 +151,24 @@ Returns:
 
 ```json
 {
+  "headline": "...",
   "transcript": "...",
   "summary": "...",
   "key_points": ["..."],
-  "decisions": ["..."],
-  "action_items": ["..."],
+  "decisions": [{"decision": "...", "reason": "...", "evidence": "..."}],
+  "action_items": [{"task": "...", "owner": "...", "deadline": "...", "priority": "high", "evidence": "..."}],
+  "topics": ["..."],
+  "open_questions": ["..."],
   "language": "en",
   "audio_duration_seconds": 84.16,
-  "backends": {"speech_to_text": "faster-whisper:base.en", "summarization": "extractive"},
-  "timing": {"transcribe_seconds": 7.0, "summarize_seconds": 0.002, "total_seconds": 7.0}
+  "backends": {"speech_to_text": "faster-whisper:base.en", "summarization": "gemini:gemini-3.5-flash-lite"},
+  "timing": {"transcribe_seconds": 7.0, "summarize_seconds": 2.1, "total_seconds": 9.1}
 }
+```
+
+Verify the Gemini stage without audio:
+
+```bash
+# needs GEMINI_API_KEY in .env
+python scripts/verify_gemini.py
 ```

@@ -7,7 +7,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.config import WHISPER_COMPUTE_TYPE, WHISPER_DEVICE, WHISPER_MODEL
+from app.config import (
+    WHISPER_BEAM_SIZE,
+    WHISPER_COMPUTE_TYPE,
+    WHISPER_DEVICE,
+    WHISPER_MODEL,
+)
 from app.pipeline.stt.base import Transcriber, Transcript
 
 
@@ -19,10 +24,12 @@ class FasterWhisperTranscriber(Transcriber):
         model_name: str = WHISPER_MODEL,
         device: str = WHISPER_DEVICE,
         compute_type: str = WHISPER_COMPUTE_TYPE,
+        beam_size: int = WHISPER_BEAM_SIZE,
     ) -> None:
         self.model_name = model_name
         self.device = device
         self.compute_type = compute_type
+        self.beam_size = beam_size
         self._model = None
 
     def _load(self):
@@ -41,7 +48,7 @@ class FasterWhisperTranscriber(Transcriber):
         model = self._load()
         segments, info = model.transcribe(
             str(audio_path),
-            beam_size=5,
+            beam_size=self.beam_size,
             vad_filter=True,
         )
         parts = [seg.text.strip() for seg in segments if seg.text.strip()]
