@@ -2,6 +2,10 @@
 
 **AI-Based Meeting Transcript Summarization System**
 
+
+https://github.com/user-attachments/assets/b8e0a773-73c5-45bd-9acf-3f21de83e7ef
+
+
 MeetMind turns a meeting recording into a structured summary in three steps:
 
 > Upload audio → Analyze Meeting → Display structured summary
