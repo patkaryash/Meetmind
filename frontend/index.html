@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>MeetMind — AI Meeting Intelligence</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+    >
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- Background -->
+    <div class="background-grid"></div>
+    <div class="background-glow glow-one"></div>
+    <div class="background-glow glow-two"></div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="brand">
+            <div class="brand-mark">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+
+            <div>
+                <div class="brand-name">MeetMind</div>
+                <div class="brand-subtitle">AI Meeting Intelligence</div>
+            </div>
+        </div>
+
+        <div class="header-status">
+            <span class="status-dot"></span>
+            AI Powered
+        </div>
+    </header>
+
+
+    <!-- ================= UPLOAD SCREEN ================= -->
+
+    <main id="upload-screen" class="screen active">
+
+        <section class="hero">
+
+            <div class="hero-badge">
+                <span class="badge-dot"></span>
+                Turn conversations into intelligence
+            </div>
+
+            <h1>
+                Turn meetings into
+                <span>actionable insights.</span>
+            </h1>
+
+            <p class="hero-description">
+                Upload a meeting recording and automatically generate
+                a structured summary, decisions, and action items.
+            </p>
+
+        </section>
+
+
+        <!-- Upload Card -->
+        <section class="upload-card">
+
+            <div class="card-heading">
+                <div>
+                    <h2>Upload meeting recording</h2>
+
+                    <p>
+                        Let MeetMind transform your conversation into
+                        clear, useful intelligence.
+                    </p>
+                </div>
+
+                <div class="audio-badge">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <path
+                            d="M12 15.5a3.5 3.5 0 0 0 3.5-3.5V7a3.5 3.5 0 1 0-7 0v5a3.5 3.5 0 0 0 3.5 3.5Z"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                        />
+                        <path
+                            d="M5 11.5a7 7 0 0 0 14 0M12 18.5V22M9 22h6"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                            stroke-linecap="round"
+                        />
+                    </svg>
+                </div>
+            </div>
+
+
+            <!-- Drop Zone -->
+            <div id="drop-zone" class="drop-zone">
+
+                <input
+                    type="file"
+                    id="file-input"
+                    accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/mp4"
+                    hidden
+                >
+
+                <div class="upload-icon">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <path
+                            d="M12 16V4"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                        />
+                        <path
+                            d="m7 9 5-5 5 5"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                        <path
+                            d="M5 20h14"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                        />
+                    </svg>
+                </div>
+
+                <h3>Drag & drop your meeting audio here</h3>
+
+                <div class="or-divider">
+                    <span></span>
+                    <small>or</small>
+                    <span></span>
+                </div>
+
+                <button id="browse-btn" class="browse-btn" type="button">
+                    Browse files
+                </button>
+
+                <p class="file-hint">
+                    MP3 · WAV · M4A
+                    <span>•</span>
+                    Maximum 100 MB
+                </p>
+
+            </div>
+
+
+            <!-- Selected File -->
+            <div id="file-card" class="file-card hidden">
+
+                <div class="file-icon">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <path
+                            d="M7 3h7l4 4v14H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                        />
+                        <path
+                            d="M14 3v5h5"
+                            stroke="currentColor"
+                            stroke-width="1.7"
+                        />
+                        <path
+                            d="M9 13h6M9 17h4"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            stroke-linecap="round"
+                        />
+                    </svg>
+                </div>
+
+                <div class="file-info">
+                    <strong id="file-name">meeting.mp3</strong>
+                    <span id="file-size">0 MB</span>
+                </div>
+
+                <button id="remove-btn" class="remove-btn" type="button">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <path
+                            d="M6 6l12 12M18 6 6 18"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                        />
+                    </svg>
+                </button>
+
+            </div>
+
+
+            <!-- Error -->
+            <div id="upload-error" class="upload-error hidden">
+                <span>!</span>
+                <p></p>
+            </div>
+
+
+            <!-- Analyze Button -->
+            <button
+                id="analyze-btn"
+                class="analyze-btn"
+                type="button"
+                disabled
+            >
+                <span>Analyze Meeting</span>
+
+                <svg viewBox="0 0 24 24" fill="none">
+                    <path
+                        d="M5 12h13"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                    />
+                    <path
+                        d="m13 6 6 6-6 6"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    />
+                </svg>
+            </button>
+
+        </section>
+
+
+        <!-- Feature Row -->
+        <section class="feature-row">
+
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <path
+                            d="M4 5h16v14H4z"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                        />
+                        <path
+                            d="M8 9h8M8 13h6"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                        />
+                    </svg>
+                </div>
+
+                <div>
+                    <strong>AI Summary</strong>
+                    <span>Understand the meeting quickly</span>
+                </div>
+            </div>
+
+
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <path
+                            d="M5 12.5 9.5 17 19 7"
+                            stroke="currentColor"
+                            stroke-width="1.8"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                    </svg>
+                </div>
+
+                <div>
+                    <strong>Decisions</strong>
+                    <span>Capture what was agreed</span>
+                </div>
+            </div>
+
+
+            <div class="feature">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none">
+                        <path
+                            d="M6 4h12v16H6z"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                        />
+                        <path
+                            d="M9 8h6M9 12h6M9 16h4"
+                            stroke="currentColor"
+                            stroke-width="1.6"
+                            stroke-linecap="round"
+                        />
+                    </svg>
+                </div>
+
+                <div>
+                    <strong>Action Items</strong>
+                    <span>Know what happens next</span>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- ================= LOADING SCREEN ================= -->
+
+    <main id="loading-screen" class="screen hidden">
+
+        <section class="loading-container">
+
+            <div class="loading-orb">
+                <div class="orb-ring"></div>
+
+                <svg viewBox="0 0 24 24" fill="none">
+                    <path
+                        d="M12 15.5a3.5 3.5 0 0 0 3.5-3.5V7a3.5 3.5 0 1 0-7 0v5a3.5 3.5 0 0 0 3.5 3.5Z"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                    />
+                    <path
+                        d="M5 11.5a7 7 0 0 0 14 0M12 18.5V22"
+                        stroke="currentColor"
+                        stroke-width="1.7"
+                        stroke-linecap="round"
+                    />
+                </svg>
+            </div>
+
+            <div class="loading-heading">
+                <span class="eyebrow">MEETMIND AI</span>
+
+                <h2>Analyzing your meeting</h2>
+
+                <p>
+                    We're turning your conversation into structured intelligence.
+                </p>
+            </div>
+
+
+            <div class="processing-card">
+
+                <div class="processing-step completed">
+                    <div class="step-indicator">✓</div>
+
+                    <div>
+                        <strong>Meeting uploaded</strong>
+                        <span>Audio received successfully</span>
+                    </div>
+                </div>
+
+
+                <div class="processing-line"></div>
+
+
+                <div class="processing-step" id="step-transcribing">
+                    <div class="step-indicator">2</div>
+
+                    <div>
+                        <strong>Transcribing audio</strong>
+                        <span>Converting speech into text</span>
+                    </div>
+                </div>
+
+
+                <div class="processing-line"></div>
+
+
+                <div class="processing-step" id="step-analyzing">
+                    <div class="step-indicator">3</div>
+
+                    <div>
+                        <strong>Analyzing meeting</strong>
+                        <span>Finding insights and decisions</span>
+                    </div>
+                </div>
+
+
+                <div class="processing-line"></div>
+
+
+                <div class="processing-step" id="step-report">
+                    <div class="step-indicator">4</div>
+
+                    <div>
+                        <strong>Preparing report</strong>
+                        <span>Organizing your results</span>
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- ================= RESULTS SCREEN ================= -->
+
+    <main id="results-screen" class="screen hidden">
+
+        <section class="results-container">
+
+            <div class="results-topbar">
+
+                <div>
+                    <span class="eyebrow">MEETING INTELLIGENCE</span>
+                    <h1>Meeting Analysis</h1>
+                </div>
+
+                <button id="new-analysis-btn" class="secondary-btn">
+                    + New Analysis
+                </button>
+
+            </div>
+
+
+            <!-- Meeting Metadata -->
+            <div class="meeting-meta">
+
+                <div class="meta-item">
+                    <span>FILE</span>
+                    <strong id="result-filename">meeting.mp3</strong>
+                </div>
+
+                <div class="meta-item">
+                    <span>DURATION</span>
+                    <strong id="result-duration">—</strong>
+                </div>
+
+                <div class="meta-item">
+                    <span>LANGUAGE</span>
+                    <strong id="result-language">—</strong>
+                </div>
+
+            </div>
+
+
+            <!-- Headline -->
+            <section id="headline-section" class="headline-card hidden">
+                <span class="section-label">MEETING HEADLINE</span>
+                <h2 id="result-headline"></h2>
+            </section>
+
+
+            <!-- Main Grid -->
+            <div class="results-grid">
+
+                <div class="results-main">
+
+                    <!-- Summary -->
+                    <section class="result-card summary-card">
+
+                        <div class="section-heading">
+                            <div>
+                                <span class="section-label">OVERVIEW</span>
+                                <h2>Executive Summary</h2>
+                            </div>
+                        </div>
+
+                        <div id="summary-content" class="summary-content">
+                        </div>
+
+                    </section>
+
+
+                    <!-- Key Points -->
+                    <section class="result-card">
+
+                        <div class="section-heading">
+                            <div>
+                                <span class="section-label">HIGHLIGHTS</span>
+                                <h2>Key Points</h2>
+                            </div>
+
+                            <span id="keypoints-count" class="count-badge">0</span>
+                        </div>
+
+                        <div id="key-points" class="numbered-list"></div>
+
+                        <div id="keypoints-empty" class="empty-state hidden">
+                            No key points were identified.
+                        </div>
+
+                    </section>
+
+
+                    <!-- Decisions -->
+                    <section class="result-card">
+
+                        <div class="section-heading">
+                            <div>
+                                <span class="section-label">OUTCOMES</span>
+                                <h2>Decisions</h2>
+                            </div>
+
+                            <span id="decisions-count" class="count-badge">0</span>
+                        </div>
+
+                        <div id="decisions"></div>
+
+                        <div id="decisions-empty" class="empty-state hidden">
+                            No explicit decisions were identified.
+                        </div>
+
+                    </section>
+
+
+                    <!-- Action Items -->
+                    <section class="result-card action-section">
+
+                        <div class="section-heading">
+                            <div>
+                                <span class="section-label">NEXT STEPS</span>
+                                <h2>Action Items</h2>
+                            </div>
+
+                            <span id="actions-count" class="count-badge accent">
+                                0
+                            </span>
+                        </div>
+
+                        <div id="action-items"></div>
+
+                        <div id="actions-empty" class="empty-state hidden">
+                            No action items were identified.
+                        </div>
+
+                    </section>
+
+
+                    <!-- Open Questions -->
+                    <section class="result-card">
+
+                        <div class="section-heading">
+                            <div>
+                                <span class="section-label">FOLLOW-UP</span>
+                                <h2>Open Questions</h2>
+                            </div>
+
+                            <span id="questions-count" class="count-badge">0</span>
+                        </div>
+
+                        <div id="questions"></div>
+
+                        <div id="questions-empty" class="empty-state hidden">
+                            No open questions identified.
+                        </div>
+
+                    </section>
+
+
+                    <!-- Transcript -->
+                    <section class="result-card transcript-card">
+
+                        <button id="transcript-toggle" class="transcript-toggle">
+
+                            <div>
+                                <span class="section-label">SOURCE</span>
+                                <h2>Transcript</h2>
+                            </div>
+
+                            <svg viewBox="0 0 24 24" fill="none">
+                                <path
+                                    d="m6 9 6 6 6-6"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                />
+                            </svg>
+
+                        </button>
+
+                        <div id="transcript-content" class="transcript-content hidden">
+                            <pre id="transcript-text"></pre>
+                        </div>
+
+                    </section>
+
+                </div>
+
+
+                <!-- Sidebar -->
+                <aside class="results-sidebar">
+
+                    <div class="sidebar-card">
+
+                        <span class="section-label">PROCESSING</span>
+
+                        <div class="metric">
+                            <span>Transcription</span>
+                            <strong id="info-transcription">Completed</strong>
+                        </div>
+
+                        <div class="metric">
+                            <span>AI Analysis</span>
+                            <strong id="info-analysis">Completed</strong>
+                        </div>
+
+                        <div class="metric">
+                            <span>Total Time</span>
+                            <strong id="info-total">—</strong>
+                        </div>
+
+                    </div>
+
+
+                    <div class="sidebar-card">
+
+                        <span class="section-label">TOPICS</span>
+
+                        <div id="topics" class="topics-list"></div>
+
+                        <div id="topics-empty" class="sidebar-empty hidden">
+                            No topics identified.
+                        </div>
+
+                    </div>
+
+
+                    <div class="sidebar-card">
+
+                        <span class="section-label">AI ENGINE</span>
+
+                        <div id="backends-list" class="backend-list">
+                            <div class="backend-row">
+                                <span>Transcription</span>
+                                <strong>Whisper</strong>
+                            </div>
+
+                            <div class="backend-row">
+                                <span>Analysis</span>
+                                <strong>Gemini</strong>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </aside>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <!-- ================= ERROR SCREEN ================= -->
+
+    <main id="error-screen" class="screen hidden">
+
+        <section class="error-container">
+
+            <div class="error-icon">!</div>
+
+            <span class="eyebrow">ANALYSIS ERROR</span>
+
+            <h2>Something went wrong</h2>
+
+            <p id="error-message">
+                We couldn't analyze this meeting.
+            </p>
+
+            <div class="error-actions">
+
+                <button id="retry-btn" class="primary-btn">
+                    Try Again
+                </button>
+
+                <button id="error-new-btn" class="secondary-btn">
+                    New Analysis
+                </button>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <script src="app.js"></script>
+
+</body>
+</html>

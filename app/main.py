@@ -22,8 +22,18 @@ from app.config import (
 )
 from app.pipeline.runner import MeetingPipeline
 from app.pipeline.summarize.gemini import GeminiAnalysisError
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="MeetMind", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 pipeline = MeetingPipeline()
 
 
