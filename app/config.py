@@ -12,7 +12,12 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = BASE_DIR.parent
-STATIC_DIR = BASE_DIR / "static"
+STATIC_DIR = Path(
+    os.getenv(
+        "MEETMIND_STATIC_DIR",
+        str(PROJECT_DIR / "frontend") if (PROJECT_DIR / "frontend" / "index.html").exists() else str(BASE_DIR / "static"),
+    )
+)
 UPLOAD_DIR = PROJECT_DIR / "data" / "uploads"
 
 # Load GEMINI_API_KEY / GEMINI_MODEL from .env (backend only, never frontend).
