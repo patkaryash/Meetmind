@@ -186,19 +186,27 @@
                         </span>
                         <span class="step-state">Waiting</span>
                     </li>
+                    <li class="step" id="step-keywords">
+                        <span class="step-mark" aria-hidden="true"></span>
+                        <span class="step-text">
+                            <strong>Extracting transcript keywords</strong>
+                            <span>Ranking statistically important terms</span>
+                        </span>
+                        <span class="step-state">Waiting</span>
+                    </li>
                     <li class="step" id="step-understand">
                         <span class="step-mark" aria-hidden="true"></span>
                         <span class="step-text">
-                            <strong>Understanding discussion</strong>
-                            <span>Extracting key points and topics</span>
+                            <strong>Analyzing meeting</strong>
+                            <span>Decisions, actions, open questions</span>
                         </span>
                         <span class="step-state">Waiting</span>
                     </li>
                     <li class="step" id="step-structure">
                         <span class="step-mark" aria-hidden="true"></span>
                         <span class="step-text">
-                            <strong>Structuring notes</strong>
-                            <span>Decisions, actions, open questions</span>
+                            <strong>Preparing report</strong>
+                            <span>Assembling your meeting notes</span>
                         </span>
                         <span class="step-state">Waiting</span>
                     </li>
@@ -222,6 +230,16 @@
                     <p class="report-meta">
                         <span id="meta-file">—</span><span class="meta-sep" aria-hidden="true">·</span><span id="meta-duration">—</span><span class="meta-sep" aria-hidden="true">·</span><span id="meta-language">—</span><span class="meta-sep" aria-hidden="true">·</span><span id="meta-analyzed">—</span>
                     </p>
+
+                    <div class="report-actions">
+                        <button id="pdf-btn" class="btn btn-secondary btn-compact" type="button">
+                            Download PDF
+                        </button>
+                        <label class="print-opt">
+                            <input type="checkbox" id="print-transcript">
+                            Include full transcript
+                        </label>
+                    </div>
 
                     <section class="doc-section" id="sec-summary" aria-labelledby="h-summary">
                         <div class="doc-section-head">
@@ -296,8 +314,11 @@
                         <div id="transcript-panel" class="transcript-panel hidden">
                             <div class="transcript-toolbar">
                                 <input type="search" id="transcript-search"
-                                    class="transcript-search" placeholder="Filter transcript…"
-                                    aria-label="Filter transcript">
+                                    class="transcript-search" placeholder="Search transcript…"
+                                    aria-label="Search transcript">
+                                <span id="transcript-count" class="search-count" aria-live="polite"></span>
+                                <button id="search-prev" class="btn btn-ghost btn-compact search-nav" type="button" aria-label="Previous match">↑</button>
+                                <button id="search-next" class="btn btn-ghost btn-compact search-nav" type="button" aria-label="Next match">↓</button>
                             </div>
                             <div id="transcript-body" class="transcript-body"></div>
                         </div>
@@ -319,6 +340,7 @@
                         <h3>Processing</h3>
                         <dl class="rail-list">
                             <div><dt>Transcription</dt><dd id="rail-transcribe">—</dd></div>
+                            <div><dt>Keywords</dt><dd id="rail-keywords-time">—</dd></div>
                             <div><dt>AI analysis</dt><dd id="rail-analysis">—</dd></div>
                             <div><dt>Total</dt><dd id="rail-total">—</dd></div>
                         </dl>
@@ -336,6 +358,13 @@
                         <h3>Topics</h3>
                         <div id="rail-topics" class="chip-row"></div>
                         <p id="rail-topics-empty" class="rail-empty hidden">No topics identified.</p>
+                    </section>
+
+                    <section class="rail-block" id="rail-keywords-block">
+                        <h3>Transcript keywords</h3>
+                        <div id="rail-keywords" class="chip-row"></div>
+                        <p id="rail-keywords-empty" class="rail-empty hidden">No keywords extracted.</p>
+                        <p class="rail-note">Ranked by TF-IDF statistics, not AI topics.</p>
                     </section>
                 </aside>
 

@@ -14,8 +14,8 @@ const ALLOWED_EXTENSIONS = new Set([".mp3", ".wav", ".m4a"]);
 
 const STATUS_MESSAGES = [
     "Transcribing the recording…",
-    "Extracting key discussion points…",
-    "Identifying decisions and action items…",
+    "Extracting transcript keywords…",
+    "Analyzing the meeting…",
     "Preparing your meeting report…"
 ];
 
@@ -62,7 +62,7 @@ const uploadError = $("upload-error");
 
 const procFilename = $("proc-filename");
 const procStatus = $("proc-status");
-const steps = [$("step-transcribe"), $("step-understand"), $("step-structure")];
+const steps = [$("step-transcribe"), $("step-keywords"), $("step-understand"), $("step-structure")];
 
 /* ================= VIEW SWITCHING ================= */
 
@@ -217,10 +217,12 @@ async function analyzeMeeting() {
     showView(views.processing);
 
     // Cosmetic stage progression; completion is driven by the real response.
+    // No percentages: each stage maps to a real pipeline step
+    // (transcribe → keywords → analyze → report).
     state.timers.push(
         setTimeout(() => { setStep(0, "done"); setStep(1, "active"); procStatus.textContent = STATUS_MESSAGES[1]; }, 1200),
-        setTimeout(() => { procStatus.textContent = STATUS_MESSAGES[2]; }, 4000),
-        setTimeout(() => { setStep(1, "done"); setStep(2, "active"); procStatus.textContent = STATUS_MESSAGES[3]; }, 9000)
+        setTimeout(() => { setStep(1, "done"); setStep(2, "active"); procStatus.textContent = STATUS_MESSAGES[2]; }, 4000),
+        setTimeout(() => { setStep(2, "done"); setStep(3, "active"); procStatus.textContent = STATUS_MESSAGES[3]; }, 9000)
     );
 
     const formData = new FormData();
@@ -238,7 +240,7 @@ async function analyzeMeeting() {
         const data = await response.json();
         state.analysis = data;
         state.analyzedAt = new Date();
-        setStep(0, "done"); setStep(1, "done"); setStep(2, "done");
+        setStep(0, "done"); setStep(1, "done"); setStep(2, "done"); setStep(3, "done");
         renderResults(data);
         showView(views.results);
     } catch (error) {
@@ -295,13 +297,63 @@ function el(tag, className, text) {
 
 /* ================= EVIDENCE ================= */
 
+function canonJs(text) {
+    return String(text || "").toLowerCase()
+        .replace(/[^\p{L}\p{N}]+/gu, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
 function evidenceNode(quote) {
     if (!quote || !String(quote).trim()) return null;
+    const clean = String(quote).trim();
     const details = el("details", "evidence");
     const summary = el("summary", null, "Evidence");
-    const quoteEl = el("blockquote", null, String(quote).trim());
-    details.append(summary, quoteEl);
+    const quoteEl = el("blockquote", null, clean);
+    const jump = el("button", "evidence-jump", "View in transcript");
+    jump.type = "button";
+    jump.addEventListener("click", () => viewEvidenceInTranscript(clean, jump));
+    details.append(summary, quoteEl, jump);
     return details;
+}
+
+function openTranscriptPanel() {
+    const panel = $("transcript-panel");
+    if (!panel || !panel.classList.contains("hidden")) return;
+    panel.classList.remove("hidden");
+    $("transcript-toggle").setAttribute("aria-expanded", "true");
+    const hint = $("transcript-hint");
+    if (hint) hint.textContent = hint.textContent.replace("Show", "Hide");
+}
+
+function viewEvidenceInTranscript(quote, anchor) {
+    openTranscriptPanel();
+    // Reset any active search filter so the passage is visible.
+    const searchInput = $("transcript-search");
+    if (searchInput && searchInput.value) {
+        searchInput.value = "";
+        paintTranscript("");
+    }
+    const body = $("transcript-body");
+    body.querySelectorAll(".flash").forEach(n => n.classList.remove("flash"));
+
+    const norm = canonJs(quote);
+    const paras = Array.from(body.querySelectorAll("p"));
+    let target = paras.find(p => norm && canonJs(p.textContent).includes(norm));
+    if (!target && norm) {
+        // Fall back to the opening chunk: long quotes may be trimmed excerpts.
+        const head = norm.slice(0, 60);
+        target = paras.find(p => head && canonJs(p.textContent).includes(head));
+    }
+    if (target) {
+        target.classList.add("flash");
+        target.scrollIntoView({ block: "center", behavior: "smooth" });
+        setTimeout(() => target.classList.remove("flash"), 2600);
+    } else if (anchor && !anchor.parentElement.querySelector(".evidence-miss")) {
+        const note = el("span", "evidence-miss", "No exact passage found in the transcript.");
+        anchor.after(note);
+        setTimeout(() => note.remove(), 4000);
+    }
 }
 
 /* ================= SECTION RENDERERS ================= */
@@ -435,6 +487,8 @@ function renderQuestions(items) {
 }
 
 let transcriptParas = [];
+let searchMarks = [];
+let searchIndex = -1;
 
 function renderTranscript(transcript) {
     const body = $("transcript-body");
@@ -448,13 +502,41 @@ function renderTranscript(transcript) {
     }
     $("transcript-hint").textContent = transcriptParas.length
         ? `Show · ${transcriptParas.length} passages` : "Show";
+    const searchInput = $("transcript-search");
+    if (searchInput) searchInput.value = "";
     paintTranscript("");
     collapseTranscript();
+}
+
+function updateSearchCount() {
+    const countEl = $("transcript-count");
+    if (!countEl) return;
+    if (!searchMarks.length) {
+        const q = ($("transcript-search")?.value || "").trim();
+        countEl.textContent = q ? "No matches" : "";
+        return;
+    }
+    countEl.textContent = `${searchIndex + 1} of ${searchMarks.length}`;
+}
+
+function gotoMatch(index, scroll = true) {
+    if (!searchMarks.length) return;
+    searchIndex = ((index % searchMarks.length) + searchMarks.length) % searchMarks.length;
+    searchMarks.forEach((m, i) => m.classList.toggle("current", i === searchIndex));
+    if (scroll) searchMarks[searchIndex].scrollIntoView({ block: "center" });
+    updateSearchCount();
+}
+
+function stepMatch(delta) {
+    if (!searchMarks.length) return;
+    gotoMatch(searchIndex + delta);
 }
 
 function paintTranscript(query) {
     const body = $("transcript-body");
     body.replaceChildren();
+    searchMarks = [];
+    searchIndex = -1;
     const q = (query || "").trim().toLowerCase();
     const frag = document.createDocumentFragment();
     let shown = 0;
@@ -468,7 +550,9 @@ function paintTranscript(query) {
             let i = 0, idx;
             while ((idx = lower.indexOf(q, i)) !== -1) {
                 para.append(document.createTextNode(p.slice(i, idx)));
-                para.append(el("mark", null, p.slice(idx, idx + q.length)));
+                const mark = el("mark", null, p.slice(idx, idx + q.length));
+                para.append(mark);
+                searchMarks.push(mark);
                 i = idx + q.length;
             }
             para.append(document.createTextNode(p.slice(i)));
@@ -479,12 +563,23 @@ function paintTranscript(query) {
     });
     if (!shown) frag.append(el("p", "transcript-empty", "No passages match this filter."));
     body.append(frag);
+    if (searchMarks.length) gotoMatch(0, false);
+    else updateSearchCount();
 }
 
 function collapseTranscript() {
     $("transcript-panel").classList.add("hidden");
     $("transcript-toggle").setAttribute("aria-expanded", "false");
     $("transcript-hint").textContent = $("transcript-hint").textContent.replace("Hide", "Show");
+}
+
+function renderKeywords(items) {
+    const rail = $("rail-keywords");
+    if (!rail) return;
+    rail.replaceChildren();
+    const arr = (Array.isArray(items) ? items : []).map(textOf).filter(Boolean);
+    $("rail-keywords-empty")?.classList.toggle("hidden", arr.length > 0);
+    arr.slice(0, 12).forEach(t => rail.append(el("span", "chip", t)));
 }
 
 function renderMeta(data) {
@@ -503,6 +598,7 @@ function renderMeta(data) {
 
     const t = data.timing || {};
     $("rail-transcribe").textContent = formatSecs(t.transcribe_seconds);
+    $("rail-keywords-time").textContent = formatSecs(t.keywords_seconds);
     $("rail-analysis").textContent = formatSecs(t.summarize_seconds);
     $("rail-total").textContent = formatSecs(t.total_seconds);
 
@@ -518,6 +614,7 @@ function renderResults(data = {}) {
     renderDecisions(data.decisions);
     renderActions(data.action_items);
     renderTopics(data.topics);
+    renderKeywords(data.keywords);
     renderQuestions(data.open_questions);
     renderTranscript(data.transcript);
 }
@@ -606,7 +703,61 @@ $("transcript-toggle")?.addEventListener("click", () => {
         : hint.textContent.replace("Hide", "Show");
 });
 
-$("transcript-search")?.addEventListener("input", e => paintTranscript(e.target.value));
+const searchInput = $("transcript-search");
+searchInput?.addEventListener("input", e => paintTranscript(e.target.value));
+searchInput?.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        stepMatch(e.shiftKey ? -1 : 1);
+    }
+});
+$("search-prev")?.addEventListener("click", () => stepMatch(-1));
+$("search-next")?.addEventListener("click", () => stepMatch(1));
+
+/* ================= PDF EXPORT (via print) ================= */
+
+let printRestore = null;
+
+function preparePrint() {
+    const title = $("report-title")?.textContent?.trim() || "Meeting analysis";
+    const includeTranscript = !!$("print-transcript")?.checked;
+    printRestore = {
+        title: document.title,
+        withTranscript: document.body.classList.contains("print-transcript"),
+        transcriptHidden: $("transcript-panel")?.classList.contains("hidden") ?? true,
+        evidence: Array.from(document.querySelectorAll("details.evidence")).map(d => d.open)
+    };
+    document.title = `${title} — MeetMind report`;
+    document.body.classList.toggle("print-transcript", includeTranscript);
+    if (includeTranscript) openTranscriptPanel();
+    else {
+        $("transcript-panel")?.classList.add("hidden");
+        $("sec-transcript")?.classList.add("hidden");
+    }
+    document.querySelectorAll("details.evidence").forEach(d => { d.open = true; });
+}
+
+function restoreAfterPrint() {
+    if (!printRestore) return;
+    document.title = printRestore.title;
+    document.body.classList.toggle("print-transcript", printRestore.withTranscript);
+    $("sec-transcript")?.classList.remove("hidden");
+    if (printRestore.transcriptHidden) {
+        $("transcript-panel")?.classList.add("hidden");
+        $("transcript-toggle")?.setAttribute("aria-expanded", "false");
+        const hint = $("transcript-hint");
+        if (hint) hint.textContent = hint.textContent.replace("Hide", "Show");
+    }
+    document.querySelectorAll("details.evidence").forEach((d, i) => {
+        d.open = printRestore.evidence[i] ?? false;
+    });
+    printRestore = null;
+}
+
+window.addEventListener("beforeprint", preparePrint);
+window.addEventListener("afterprint", restoreAfterPrint);
+
+$("pdf-btn")?.addEventListener("click", () => window.print());
 
 $("summary-copy")?.addEventListener("click", async e => {
     const btn = e.currentTarget;

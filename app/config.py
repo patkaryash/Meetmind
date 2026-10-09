@@ -42,6 +42,9 @@ SUMMARY_SENTENCES = int(os.getenv("MEETMIND_SUMMARY_SENTENCES", "3"))
 MAX_KEY_POINTS = int(os.getenv("MEETMIND_MAX_KEY_POINTS", "6"))
 MAX_LIST_ITEMS = int(os.getenv("MEETMIND_MAX_LIST_ITEMS", "8"))
 
+# --- TF-IDF transcript keywords (local, no API) ---
+MAX_KEYWORDS = int(os.getenv("MEETMIND_MAX_KEYWORDS", "12"))
+
 # --- Gemini analysis (backend only) ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()

@@ -10,8 +10,10 @@ never exposed to the frontend.
 """
 from __future__ import annotations
 
+import difflib
 import json
 import re
+import string
 
 from app.config import (
     GEMINI_API_KEY,
@@ -114,13 +116,90 @@ def _strip_fences(raw: str) -> str:
     return m.group(1).strip() if m else raw
 
 
-def _as_str_list(value) -> list[str]:
+def _as_str_list(value, limit: int = 20) -> list[str]:
+    """Coerce to a de-duplicated list of non-empty strings (order kept).
+
+    Non-string scalars are stringified; dicts/lists are skipped instead of
+    being dumped as "{...}" into the UI. Empty lists stay empty — a meeting
+    can legitimately have no items in a section.
+    """
     if not isinstance(value, list):
         return []
-    return [str(v).strip() for v in value if str(v).strip()][:20]
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        if item is None or isinstance(item, bool):
+            continue
+        if isinstance(item, dict | list):
+            continue
+        text = str(item).strip()
+        if not text:
+            continue
+        key = text.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(text)
+        if len(out) >= limit:
+            break
+    return out
 
 
-def _normalize_decisions(value) -> list[dict]:
+def _canon(text: str) -> str:
+    """Canonical form for verbatim comparison: lowercase, no punctuation,
+    single-spaced. Lets "Hello, world!" match "hello world"."""
+    lowered = text.casefold()
+    no_punct = lowered.translate(str.maketrans(string.punctuation, " " * len(string.punctuation)))
+    return re.sub(r"\s+", " ", no_punct).strip()
+
+
+def _split_sentences(text: str) -> list[str]:
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n+", text) if s.strip()]
+
+
+def verify_evidence(evidence: str, transcript: str) -> str:
+    """Ground an evidence quote in the transcript.
+
+    Returns the evidence unchanged when it appears verbatim (modulo case /
+    punctuation), the closest actually-verbatim transcript sentence when it
+    is a close paraphrase, or "" when nothing in the transcript supports it
+    — so the UI never presents false provenance.
+    """
+    quote = (evidence or "").strip()
+    if not quote or not (transcript or "").strip():
+        return ""
+    canon_quote = _canon(quote)
+    if not canon_quote:
+        return ""
+    canon_transcript = _canon(transcript)
+    if canon_quote in canon_transcript:
+        return quote
+    # Close paraphrase? Snap to the truly verbatim sentence.
+    best, best_ratio = "", 0.0
+    for sentence in _split_sentences(transcript):
+        if len(_canon(sentence)) < max(12, len(canon_quote) // 3):
+            continue
+        ratio = difflib.SequenceMatcher(None, canon_quote, _canon(sentence)).ratio()
+        if ratio > best_ratio:
+            best, best_ratio = sentence, ratio
+    if best_ratio >= 0.8:
+        return best
+    return ""
+
+
+def _dedupe_dicts(items: list[dict], key: str) -> list[dict]:
+    seen: set[str] = set()
+    out: list[dict] = []
+    for item in items:
+        norm = _canon(str(item.get(key, "")))
+        if norm in seen:
+            continue
+        seen.add(norm)
+        out.append(item)
+    return out
+
+
+def _normalize_decisions(value, transcript: str = "") -> list[dict]:
     out: list[dict] = []
     if not isinstance(value, list):
         return out
@@ -130,20 +209,19 @@ def _normalize_decisions(value) -> list[dict]:
         if not isinstance(item, dict):
             continue
         decision = str(item.get("decision", "")).strip()
-        evidence = str(item.get("evidence", "")).strip()
         if not decision:
             continue
         out.append(
             {
                 "decision": decision,
                 "reason": str(item.get("reason", "") or "").strip(),
-                "evidence": evidence or decision,
+                "evidence": verify_evidence(str(item.get("evidence", "") or ""), transcript),
             }
         )
-    return out
+    return _dedupe_dicts(out, "decision")
 
 
-def _normalize_actions(value) -> list[dict]:
+def _normalize_actions(value, transcript: str = "") -> list[dict]:
     out: list[dict] = []
     if not isinstance(value, list):
         return out
@@ -153,7 +231,6 @@ def _normalize_actions(value) -> list[dict]:
         if not isinstance(item, dict):
             continue
         task = str(item.get("task", "")).strip()
-        evidence = str(item.get("evidence", "") or task).strip()
         if not task:
             continue
         owner = item.get("owner")
@@ -173,21 +250,21 @@ def _normalize_actions(value) -> list[dict]:
                 "owner": owner,
                 "deadline": deadline,
                 "priority": priority,
-                "evidence": evidence or task,
+                "evidence": verify_evidence(str(item.get("evidence", "") or ""), transcript),
             }
         )
-    return out
+    return _dedupe_dicts(out, "task")
 
 
-def _to_summary(data: dict) -> MeetingSummary:
+def _to_summary(data: dict, transcript: str = "") -> MeetingSummary:
     return MeetingSummary(
         headline=str(data.get("headline", "") or "Meeting analysis")[:160],
         summary=str(data.get("summary", "") or ""),
         key_points=_as_str_list(data.get("key_points")),
-        decisions=_normalize_decisions(data.get("decisions")),
-        action_items=_normalize_actions(data.get("action_items")),
-        topics=_as_str_list(data.get("topics"))[:12],
-        open_questions=_as_str_list(data.get("open_questions"))[:20],
+        decisions=_normalize_decisions(data.get("decisions"), transcript),
+        action_items=_normalize_actions(data.get("action_items"), transcript),
+        topics=_as_str_list(data.get("topics"), 12),
+        open_questions=_as_str_list(data.get("open_questions")),
     )
 
 
@@ -276,7 +353,7 @@ class GeminiSummarizer(Summarizer):
             raise GeminiAnalysisError(
                 "Gemini returned an unexpected format. Please retry the analysis."
             )
-        summary = _to_summary(data)
+        summary = _to_summary(data, text)
         if not summary.summary and not summary.key_points:
             raise GeminiAnalysisError(
                 "Gemini returned an empty analysis. Please retry with a longer recording."
