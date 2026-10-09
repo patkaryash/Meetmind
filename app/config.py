@@ -17,7 +17,7 @@ STATIC_DIR = Path(
         "MEETMIND_STATIC_DIR",
         str(PROJECT_DIR / "frontend") if (PROJECT_DIR / "frontend" / "index.html").exists() else str(BASE_DIR / "static"),
     )
-)
+).resolve()
 UPLOAD_DIR = PROJECT_DIR / "data" / "uploads"
 
 # Load GEMINI_API_KEY / GEMINI_MODEL from .env (backend only, never frontend).

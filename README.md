@@ -98,7 +98,7 @@ python scripts/run_pipeline_test.py
 app/
 ├── main.py                 # FastAPI app: /api/analyze, /api/health, static UI
 ├── config.py               # env-driven settings (incl. GEMINI_API_KEY/MODEL)
-├── static/                 # dashboard (plain HTML/CSS/JS, no build step)
+├── static/                 # legacy fallback UI (used only if frontend/ is missing)
 └── pipeline/
     ├── registry.py         # ← SWAP COMPONENTS HERE (factories)
     ├── runner.py           # MeetingPipeline: STT → summarization orchestration
@@ -109,6 +109,7 @@ app/
         ├── base.py         #   Summarizer interface + MeetingSummary schema
         ├── gemini.py       #   Gemini structured-JSON implementation
         └── extractive.py   #   pure-Python fallback (no key / offline)
+frontend/                   # dashboard (plain HTML/CSS/JS, no build step) ← served at /
 samples/                    # sample meeting audio + TTS generator
 scripts/run_pipeline_test.py
 scripts/verify_gemini.py     # transcript → Gemini JSON check (needs .env key)
