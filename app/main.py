@@ -10,8 +10,10 @@ import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+
+import hashlib
 
 from app.config import (
     ALLOWED_AUDIO_EXTENSIONS,
@@ -110,4 +112,34 @@ async def analyze(audio: UploadFile = File(...)) -> JSONResponse:
 
 
 # Serve the dashboard last so API routes take precedence.
+def _asset_version(name: str) -> str:
+    """Short content hash for cache-busting query strings.
+
+    Recomputed per process start; any frontend change produces new URLs,
+    so browsers can never pair a stale cached style.css/app.js with new HTML
+    (which renders as an unstyled "plain HTML" page).
+    """
+    try:
+        return hashlib.md5((STATIC_DIR / name).read_bytes()).hexdigest()[:8]
+    except OSError:
+        return "dev"
+
+
+def _render_index() -> str:
+    html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    css_v = _asset_version("style.css")
+    js_v = _asset_version("app.js")
+    # Absolute paths work from "/" (and avoid relative-path breakage);
+    # ?v= forces refetch after every frontend change.
+    html = html.replace('href="style.css"', f'href="/style.css?v={css_v}"')
+    html = html.replace('src="app.js"', f'src="/app.js?v={js_v}"')
+    return html
+
+
+@app.get("/", include_in_schema=False)
+def root() -> HTMLResponse:
+    # no-store: entry HTML is tiny; always revalidate so asset ?v= stays fresh.
+    return HTMLResponse(content=_render_index(), headers={"Cache-Control": "no-store"})
+
+
 app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
